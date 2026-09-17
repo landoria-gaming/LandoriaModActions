@@ -1,11 +1,11 @@
 # Landoria Mod Actions
 
-Manual `Release package` builds one Thunderstore ZIP when both versions match X.Y.Z.
+Manual `Release package` builds one Thunderstore ZIP when all five source versions match X.Y.Z.
 The ZIP is a workflow artifact; no GitHub release or tag is created.
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
-## Shared organization references (v4.3)
+## Shared organization references (v4.5)
 
 All mods use the same private reference bundle in
 `landoria-gaming/LandoriaModReferences`, containing Valheim/Unity managed DLLs
@@ -21,7 +21,7 @@ success with a two-hour download grace period. Expired references are regenerate
 - `check-snapshot`: both AssemblyInformationalVersion and version_number must equal X.Y.Z-snapshot.
 - `restore-references`: dispatches the central check, waits for success, downloads that run's bundle, verifies all DLL hashes and exports build paths.
 - `build-snapshot`: builds with the mod's HarmonyValidator and calls its PackageThunderstore target. Reference versions and source run are recorded in build metadata.
-- `publish-snapshot`: updates the snapshot prerelease and its stable ZIP assets, only for the current main head.
+- `publish-snapshot`: updates the snapshot prerelease with only the versioned Thunderstore ZIP, only for the current main head.
 
 Composite actions require Windows, Bash and jq. Compilation, staging and ZIP
 creation use MSBuild targets. PowerShell scripts are not used. The publishing action requires
@@ -43,7 +43,7 @@ jobs:
   snapshot:
     permissions:
       contents: write
-    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.3
+    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.5
     with:
       project-file: Landoria.FirstPerson.csproj
       mod-name: Landoria.FirstPerson

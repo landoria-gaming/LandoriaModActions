@@ -7,12 +7,18 @@ fixture=$(mktemp -d)
 trap 'rm -rf "$fixture"' EXIT
 export MANIFEST_PATH="$fixture/manifest.json" ASSEMBLY_INFO_PATH="$fixture/AssemblyInfo.cs"
 export GITHUB_OUTPUT="$fixture/output" GITHUB_STEP_SUMMARY="$fixture/summary"
+export PLUGIN_SOURCE_PATH="$fixture/TestPlugin.cs"
+printf 'private const string PluginVersion = "1.0.11";\n' > "$PLUGIN_SOURCE_PATH"
+write_assembly() {
+  printf '[assembly: AssemblyInformationalVersion("%s")]\n[assembly: AssemblyVersion("%s")]\n[assembly: AssemblyFileVersion("%s")]\n' "$1" "$2" "$3" > "$ASSEMBLY_INFO_PATH"
+}
 check() {
   printf '{"version_number":"%s"}\n' "$1" > "$MANIFEST_PATH"
-  printf '[assembly: AssemblyInformationalVersion("%s")]\n' "$2" > "$ASSEMBLY_INFO_PATH"
+  base=${2%-snapshot}
+  write_assembly "$2" "$base.*" "$base"
   : > "$GITHUB_OUTPUT"
   bash "$root/tools/check-snapshot.sh"
-  [[ $(tr -d '\r' < "$GITHUB_OUTPUT") == "eligible=$3" ]]
+  grep -qx "eligible=$3" "$GITHUB_OUTPUT"
 }
 check 1.0.11-snapshot 1.0.11-snapshot true
 check 1.0.12-snapshot 1.0.11-snapshot false
@@ -27,7 +33,8 @@ bash "$root/tools/check-snapshot.sh"
 
 check_release() {
   printf '{"version_number":"%s"}\n' "$1" > "$MANIFEST_PATH"
-  printf '[assembly: AssemblyInformationalVersion("%s")]\n' "$2" > "$ASSEMBLY_INFO_PATH"
+  base=${2%-snapshot}
+  write_assembly "$2" "$base.*" "$base"
   : > "$GITHUB_OUTPUT"
   bash "$root/tools/check-release.sh"
   grep -qx "eligible=$3" "$GITHUB_OUTPUT"
@@ -45,6 +52,26 @@ grep -qx 'eligible=false' "$GITHUB_OUTPUT"
 printf '{invalid' > "$MANIFEST_PATH"
 bash "$root/tools/check-release.sh"
 
+# Every additional version must match in both modes.
+for mode in snapshot release; do
+  version=1.0.11
+  [[ "$mode" != snapshot ]] || version=1.0.11-snapshot
+  for field in assembly file plugin; do
+    write_assembly "$version" '1.0.11.*' 1.0.11
+    printf 'private const string PluginVersion = "1.0.11";\n' > "$PLUGIN_SOURCE_PATH"
+    printf '{"version_number":"%s"}\n' "$version" > "$MANIFEST_PATH"
+    case "$field" in
+      assembly) write_assembly "$version" '1.0.10.*' 1.0.11 ;;
+      file) write_assembly "$version" '1.0.11.*' 1.0.10 ;;
+      plugin) printf 'private const string PluginVersion = "1.0.10";\n' > "$PLUGIN_SOURCE_PATH" ;;
+    esac
+    : > "$GITHUB_OUTPUT"
+    bash "$root/tools/check-versions.sh" "$mode"
+    grep -qx 'eligible=false' "$GITHUB_OUTPUT"
+  done
+done
+printf 'private const string PluginVersion = "1.0.11";\n' > "$PLUGIN_SOURCE_PATH"
+
 # MSBuild rejects invalid versions before invoking the mod packaging target.
 mkdir -p "$fixture/Properties"
 cp "$ASSEMBLY_INFO_PATH" "$fixture/Properties/AssemblyInfo.cs"
@@ -52,7 +79,8 @@ printf '%s\n' '<Project><Target Name="PackageThunderstore"><WriteLinesToFile Fil
 release_project=$(cygpath -m "$root/tools/release.proj")
 mod_project=$(cygpath -m "$fixture/ReleaseTest.proj")
 printf '{"version_number":"1.0.11"}\n' > "$MANIFEST_PATH"
-printf '[assembly: AssemblyInformationalVersion("1.0.11")]\n' > "$fixture/Properties/AssemblyInfo.cs"
+write_assembly 1.0.11 '1.0.11.*' 1.0.11
+cp "$ASSEMBLY_INFO_PATH" "$fixture/Properties/AssemblyInfo.cs"
 dotnet msbuild "$release_project" -t:PackageRelease "-p:ModProject=$mod_project"
 [[ -f "$fixture/built.txt" ]]
 rm "$fixture/built.txt"
@@ -60,6 +88,24 @@ for version in 1.0.12 1.0.11-snapshot; do
   printf '{"version_number":"%s"}\n' "$version" > "$MANIFEST_PATH"
   if dotnet msbuild "$release_project" -t:PackageRelease "-p:ModProject=$mod_project"; then exit 1; fi
   [[ ! -f "$fixture/built.txt" ]]
+done
+
+for mode in snapshot release; do
+  version=1.0.11
+  [[ "$mode" != snapshot ]] || version=1.0.11-snapshot
+  for field in assembly file plugin; do
+    write_assembly "$version" '1.0.11.*' 1.0.11
+    printf 'private const string PluginVersion = "1.0.11";\n' > "$PLUGIN_SOURCE_PATH"
+    printf '{"version_number":"%s"}\n' "$version" > "$MANIFEST_PATH"
+    case "$field" in
+      assembly) write_assembly "$version" '1.0.10.*' 1.0.11 ;;
+      file) write_assembly "$version" '1.0.11.*' 1.0.10 ;;
+      plugin) printf 'private const string PluginVersion = "1.0.10";\n' > "$PLUGIN_SOURCE_PATH" ;;
+    esac
+    cp "$ASSEMBLY_INFO_PATH" "$fixture/Properties/AssemblyInfo.cs"
+    if dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:ValidateModVersions \
+      "-p:ModRoot=$(cygpath -m "$fixture")" "-p:VersionMode=$mode"; then exit 1; fi
+  done
 done
 
 # Mock the API, never make a real dispatch in tests.
@@ -129,14 +175,14 @@ dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:StageSnapshot \
 dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:Zip \
   "-p:SourceDirectory=$(cygpath -m "$fixture/bin/snapshot")" "-p:DestinationFile=$(cygpath -m "$fixture/snapshot.zip")"
 [[ -s "$fixture/snapshot.zip" ]]
-# Publication keeps the version in both asset names and removes old names after upload.
+# Publication keeps only the versioned Thunderstore ZIP, after a successful upload.
 mkdir -p "$fixture/snapshot" "$fixture/thunderstore"
 printf '{"version_number":"1.0.11-snapshot"}\n' > "$fixture/snapshot/manifest.json"
 cp "$fixture/snapshot.zip" "$fixture/thunderstore/Landoria-Test-1.0.11-snapshot.zip"
 gh() {
   case "$*" in
     *'git/ref/heads/main'*) echo abc ;;
-    'release view snapshot --json assets') echo '{"assets":[{"name":"Landoria-Test-snapshot.zip"}]}' ;;
+    'release view snapshot --json assets') echo '{"assets":[{"name":"Landoria-Test-snapshot.zip"},{"name":"Landoria.Test-1.0.11-snapshot.zip"}]}' ;;
     'release upload '*|'release delete-asset '*) printf '%s\n' "$*" >> "$ASSET_TRACE" ;;
     *) return 0 ;;
   esac
@@ -145,6 +191,7 @@ export -f gh
 export ASSET_TRACE="$fixture/asset-trace" MOD_NAME=Landoria.Test PACKAGE_NAME=Test GH_REPO=org/Test
 export GITHUB_REF=refs/heads/main GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA=abc GITHUB_RUN_ID=123 GITHUB_SERVER_URL=https://github.com
 (cd "$fixture"; bash "$root/tools/publish-snapshot.sh")
-grep -q 'release upload snapshot release/Landoria-Test-1.0.11-snapshot.zip release/Landoria.Test-1.0.11-snapshot.zip' "$ASSET_TRACE"
+grep -qx 'release upload snapshot release/Landoria-Test-1.0.11-snapshot.zip --clobber' "$ASSET_TRACE"
 grep -q 'release delete-asset snapshot Landoria-Test-snapshot.zip' "$ASSET_TRACE"
+grep -q 'release delete-asset snapshot Landoria.Test-1.0.11-snapshot.zip' "$ASSET_TRACE"
 echo 'Bash action tests passed.'

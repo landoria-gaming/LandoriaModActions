@@ -28,7 +28,7 @@ jobs:
         with:
           persist-credentials: false
       - id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-release@v4.4
+        uses: landoria-gaming/LandoriaModActions/actions/check-release@v4.5
   package:
     needs: eligibility
     if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
@@ -42,12 +42,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.4
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.5
         with:
           references-repository: ${{ inputs.references-repository }}
           token: ${{ secrets.references-token }}
       - name: Build release ZIP
-        uses: landoria-gaming/LandoriaModActions/actions/build-release@v4.4
+        uses: landoria-gaming/LandoriaModActions/actions/build-release@v4.5
         with:
           project-file: ${{ inputs.project-file }}
       - name: Upload release ZIP

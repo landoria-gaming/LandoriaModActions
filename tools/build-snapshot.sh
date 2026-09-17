@@ -6,6 +6,8 @@ native_path() { cygpath -m "$1"; }
 mkdir -p obj
 printf 'Compilation references: Valheim %s | BepInEx %s | Reference run %s\n' \
   "$VALHEIM_VERSION" "$BEPINEX_VERSION" "$REFERENCE_RUN_ID" | tee obj/snapshot-build.log
+dotnet msbuild "$(native_path "$tools/archive.proj")" -t:ValidateModVersions \
+  "-p:ModRoot=$(native_path "$PWD")" -p:VersionMode=snapshot
 dotnet build "$PROJECT_FILE" -c Release --nologo -p:Platform=AnyCPU -v minimal -fl '-flp:logfile=obj/snapshot-build.log;verbosity=normal;append'
 temp=$(cygpath -u "$RUNNER_TEMP")
 dotnet msbuild "$(native_path "$tools/archive.proj")" -t:StageSnapshot \

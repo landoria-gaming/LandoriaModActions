@@ -1,0 +1,49 @@
+<Project>
+  <UsingTask TaskName="CheckModVersions" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <ModRoot ParameterType="System.String" Required="true" />
+      <Mode ParameterType="System.String" Required="true" />
+      <Eligible ParameterType="System.Boolean" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        Eligible = false;
+        try
+        {
+            var manifest = File.ReadAllText(Path.Combine(ModRoot, "manifest.json"));
+            var assembly = File.ReadAllText(Path.Combine(ModRoot, "Properties", "AssemblyInfo.cs"));
+            var plugins = Directory.GetFiles(ModRoot, "*Plugin.cs", SearchOption.TopDirectoryOnly);
+            if (plugins.Length != 1) return true;
+            var plugin = File.ReadAllText(plugins[0]);
+            Func<string, string, string> one = (text, pattern) => {
+                var matches = Regex.Matches(text, pattern, RegexOptions.Multiline);
+                return matches.Count == 1 ? matches[0].Groups[1].Value : "";
+            };
+            Func<string, string> attribute = name => one(assembly, @"^\s*\[assembly:\s*" + name + "\\(\"([^\"]+)\"\\)\\]");
+            var version = one(manifest, "\"version_number\"\\s*:\\s*\"([^\"]+)\"");
+            var informational = attribute("AssemblyInformationalVersion");
+            var assemblyVersion = attribute("AssemblyVersion");
+            var fileVersion = attribute("AssemblyFileVersion");
+            var pluginVersion = one(plugin, @"^\s*(?:(?:public|private|internal|protected|static)\s+)*const\s+string\s+PluginVersion\s*=\s*""([^""]+)""\s*;");
+            var snapshot = Mode == "snapshot";
+            var basis = snapshot && version.EndsWith("-snapshot", StringComparison.Ordinal) ? version.Substring(0, version.Length - 9) : version;
+            if (assemblyVersion.EndsWith(".*", StringComparison.Ordinal)) assemblyVersion = assemblyVersion.Substring(0, assemblyVersion.Length - 2);
+            Eligible = (snapshot || Mode == "release") && Regex.IsMatch(version, snapshot ? @"^\d+\.\d+\.\d+-snapshot$" : @"^\d+\.\d+\.\d+$")
+                && informational == version && assemblyVersion == basis && fileVersion == basis && pluginVersion == basis;
+            Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High,
+                "Versions: manifest={0} | informational={1} | assembly={2} | file={3} | plugin={4}", version, informational, assemblyVersion, fileVersion, pluginVersion);
+        }
+        catch (Exception ex) { Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High, "Cannot read mod versions: {0}", ex.Message); }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="ValidateModVersions">
+    <CheckModVersions ModRoot="$(ModRoot)" Mode="$(VersionMode)">
+      <Output TaskParameter="Eligible" PropertyName="_ModVersionsEligible" />
+    </CheckModVersions>
+    <Error Condition="'$(_ModVersionsEligible)' != 'True'" Text="All five mod versions must match; only manifest and informational version use -snapshot in snapshot builds." />
+  </Target>
+</Project>

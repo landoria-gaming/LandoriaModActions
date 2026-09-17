@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="versions.targets" />
   <Target Name="Zip">
     <Error Condition="'$(SourceDirectory)' == '' Or '$(DestinationFile)' == ''" Text="SourceDirectory and DestinationFile are required." />
     <ZipDirectory SourceDirectory="$(SourceDirectory)" DestinationFile="$(DestinationFile)" Overwrite="true" />
