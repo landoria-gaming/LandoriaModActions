@@ -92,4 +92,22 @@ dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:StageSnapshot \
 dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:Zip \
   "-p:SourceDirectory=$(cygpath -m "$fixture/bin/snapshot")" "-p:DestinationFile=$(cygpath -m "$fixture/snapshot.zip")"
 [[ -s "$fixture/snapshot.zip" ]]
+# Publication keeps the version in both asset names and removes old names after upload.
+mkdir -p "$fixture/snapshot" "$fixture/thunderstore"
+printf '{"version_number":"1.0.11-snapshot"}\n' > "$fixture/snapshot/manifest.json"
+cp "$fixture/snapshot.zip" "$fixture/thunderstore/Landoria-Test-1.0.11-snapshot.zip"
+gh() {
+  case "$*" in
+    *'git/ref/heads/main'*) echo abc ;;
+    'release view snapshot --json assets') echo '{"assets":[{"name":"Landoria-Test-snapshot.zip"}]}' ;;
+    'release upload '*|'release delete-asset '*) printf '%s\n' "$*" >> "$ASSET_TRACE" ;;
+    *) return 0 ;;
+  esac
+}
+export -f gh
+export ASSET_TRACE="$fixture/asset-trace" MOD_NAME=Landoria.Test PACKAGE_NAME=Test GH_REPO=org/Test
+export GITHUB_REF=refs/heads/main GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA=abc GITHUB_RUN_ID=123 GITHUB_SERVER_URL=https://github.com
+(cd "$fixture"; bash "$root/tools/publish-snapshot.sh")
+grep -q 'release upload snapshot release/Landoria-Test-1.0.11-snapshot.zip release/Landoria.Test-1.0.11-snapshot.zip' "$ASSET_TRACE"
+grep -q 'release delete-asset snapshot Landoria-Test-snapshot.zip' "$ASSET_TRACE"
 echo 'Bash action tests passed.'

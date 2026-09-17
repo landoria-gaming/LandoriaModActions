@@ -2,7 +2,7 @@
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
-## Shared organization references (v4.2)
+## Shared organization references (v4.3)
 
 All mods use the same private reference bundle in
 `landoria-gaming/LandoriaModReferences`, containing Valheim/Unity managed DLLs
@@ -40,7 +40,7 @@ jobs:
   snapshot:
     permissions:
       contents: write
-    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.2
+    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.3
     with:
       project-file: Landoria.FirstPerson.csproj
       mod-name: Landoria.FirstPerson

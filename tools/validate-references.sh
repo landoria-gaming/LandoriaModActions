@@ -13,7 +13,7 @@ for kind in valheim bepinex; do
   while IFS=$'\t' read -r name hash; do
     hash=${hash//$'\r'/}
     [[ "$name" =~ ^[A-Za-z0-9_.-]+\.dll$ && "$hash" =~ ^[A-Fa-f0-9]{64}$ ]] || exit 1
-    if [[ "$kind" == bepinex ]]; then [[ "$name" == BepInEx.dll || "$name" == 0Harmony.dll ]] || exit 1; fi
+    if [[ "$kind" == bepinex ]]; then [[ "$name" == BepInEx.dll || "$name" == 0Harmony.dll || "$name" == Mono.Cecil.dll ]] || exit 1; fi
     [[ -s "$managed/$name" ]] || exit 1
     actual_hash=$(sha256sum "$managed/$name"); actual_hash=${actual_hash%% *}
     [[ "${actual_hash,,}" == "${hash,,}" ]] || { echo "Invalid hash: $name" >&2; exit 1; }

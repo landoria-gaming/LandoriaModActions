@@ -34,7 +34,7 @@ jobs:
         with:
           persist-credentials: false
       - id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v4.2
+        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v4.3
   build:
     needs: eligibility
     if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -49,12 +49,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.2
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.3
         with:
           references-repository: ${{ inputs.references-repository }}
           token: ${{ secrets.references-token }}
       - name: Build and package snapshot
-        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v4.2
+        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v4.3
         with:
           project-file: ${{ inputs.project-file }}
           mod-name: ${{ inputs.mod-name }}
@@ -106,7 +106,7 @@ jobs:
           name: ${{ inputs.mod-name }}-snapshot-${{ github.sha }}-${{ github.run_attempt }}
           path: snapshot
       - name: Replace snapshot release
-        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v4.2
+        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v4.3
         with:
           mod-name: ${{ inputs.mod-name }}
           package-name: ${{ inputs.package-name }}

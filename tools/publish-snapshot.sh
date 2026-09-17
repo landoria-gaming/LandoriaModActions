@@ -10,13 +10,14 @@ shopt -s nullglob
 packages=(thunderstore/*.zip)
 [[ ${#packages[@]} -eq 1 ]] || { echo 'Expected exactly one Thunderstore ZIP.' >&2; exit 1; }
 mkdir -p release
-thunderstore="Landoria-$PACKAGE_NAME-snapshot.zip"
-snapshot="$MOD_NAME-snapshot.zip"
+version=$(jq -r '.version_number' snapshot/manifest.json | tr -d '\r')
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-snapshot$ ]] || exit 1
+thunderstore="Landoria-$PACKAGE_NAME-$version.zip"
+snapshot="$MOD_NAME-$version.zip"
 cp "${packages[0]}" "release/$thunderstore"
 tools=$(cd "$(dirname "$0")" && pwd)
 dotnet msbuild "$(cygpath -m "$tools/archive.proj")" -t:Zip \
   "-p:SourceDirectory=$(cygpath -m "$PWD/snapshot")" "-p:DestinationFile=$(cygpath -m "$PWD/release/$snapshot")"
-version=$(jq -r '.version_number' snapshot/manifest.json | tr -d '\r')
 printf 'Latest development snapshot from main. Replaced after each successful snapshot build.\n\nVersion: %s\nCommit: %s\nBuild: %s/%s/actions/runs/%s\n' \
   "$version" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GH_REPO" "$GITHUB_RUN_ID" > release/notes.md
 if gh api "repos/$GH_REPO/git/ref/tags/snapshot" --silent 2>/dev/null; then

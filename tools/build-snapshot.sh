@@ -12,6 +12,7 @@ dotnet msbuild "$(native_path "$tools/archive.proj")" -t:StageSnapshot \
   "-p:ModRoot=$(native_path "$PWD")" "-p:ModName=$MOD_NAME" \
   "-p:ReferenceMetadata=$(native_path "$temp/snapshot-dependencies/valheim-appmanifest.acf")"
 [[ -s "bin/snapshot/$MOD_NAME.dll" ]] || exit 1
+dotnet msbuild "$PROJECT_FILE" -t:StageSnapshotExtras -p:Configuration=Release
 hash=$(sha256sum "bin/snapshot/$MOD_NAME.dll"); hash=${hash%% *}
 jq -n --arg commit "$(git rev-parse HEAD | tr -d '\r')" --arg run "$GITHUB_RUN_ID" \
   --arg attempt "$GITHUB_RUN_ATTEMPT" --arg utc "$(date -u +%FT%TZ)" \
