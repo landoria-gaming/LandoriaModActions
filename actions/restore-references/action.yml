@@ -1,26 +1,24 @@
 name: Restore shared compilation references
-description: Download the private organization-wide reference bundle and validate its DLL hashes
+description: Refresh references on demand in the private store, then validate and configure them
 inputs:
   references-repository:
-    description: Private shared reference repository
+    description: Private reference repository
     default: landoria-gaming/LandoriaModReferences
   token:
-    description: Dedicated token with Actions write access to the shared private repository only
+    description: Dedicated Actions write token restricted to the private reference repository
     required: true
 runs:
   using: composite
   steps:
-    - name: Check shared references on demand and wait for validation
+    - name: Check shared references on demand
       id: references
-      shell: pwsh
+      shell: bash
       env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
         GH_TOKEN: ${{ inputs.token }}
         REFERENCE_REPOSITORY: ${{ inputs.references-repository }}
-        ACTION_DIRECTORY: ${{ github.action_path }}
-      run: |
-        & "$env:ACTION_DIRECTORY/../../tools/Request-References.ps1" -Repository $env:REFERENCE_REPOSITORY
-
-    - name: Download the common reference bundle
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/request-references.sh" "$REFERENCE_REPOSITORY"
+    - name: Download validated shared bundle
       uses: actions/download-artifact@v5
       with:
         repository: ${{ inputs.references-repository }}
@@ -28,26 +26,9 @@ runs:
         run-id: ${{ steps.references.outputs.run-id }}
         name: mod-compilation-references
         path: ${{ runner.temp }}/shared-references
-
     - name: Validate and configure references
-      shell: pwsh
+      shell: bash
       env:
         ACTION_DIRECTORY: ${{ github.action_path }}
         REFERENCE_RUN_ID: ${{ steps.references.outputs.run-id }}
-      run: |
-        $ErrorActionPreference = 'Stop'
-        $root = Join-Path $env:RUNNER_TEMP 'shared-references'
-        & "$env:ACTION_DIRECTORY/../../tools/Validate-References.ps1" -Root $root
-        $bundle = Get-Content -LiteralPath "$root/bundle.json" -Raw | ConvertFrom-Json
-        $valheim = Get-Content -LiteralPath "$root/valheim-references/build-references.json" -Raw | ConvertFrom-Json
-        $bepinex = Get-Content -LiteralPath "$root/bepinex-references/build-references.json" -Raw | ConvertFrom-Json
-        if ($bundle.valheimVersion -ne $valheim.version -or $bundle.bepinexVersion -ne $bepinex.version -or
-            "$($bundle.sourceRun)" -ne $env:REFERENCE_RUN_ID) { throw 'Shared reference catalogue mismatch.' }
-        "ValheimGamePath=$root/valheim-references" >> $env:GITHUB_ENV
-        "BepInExPath=$root/bepinex-references/BepInEx" >> $env:GITHUB_ENV
-        "BEPINEX_VERSION=$($bundle.bepinexVersion)" >> $env:GITHUB_ENV
-        "VALHEIM_VERSION=$($bundle.valheimVersion)" >> $env:GITHUB_ENV
-        "REFERENCE_RUN_ID=$env:REFERENCE_RUN_ID" >> $env:GITHUB_ENV
-        $dependencies = Join-Path $env:RUNNER_TEMP 'snapshot-dependencies'
-        New-Item -ItemType Directory -Path $dependencies -Force | Out-Null
-        Copy-Item -LiteralPath "$root/valheim-references/valheim-appmanifest.acf" -Destination "$dependencies/valheim-appmanifest.acf"
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/configure-references.sh"

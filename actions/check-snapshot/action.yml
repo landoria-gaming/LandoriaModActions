@@ -14,25 +14,10 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Compare snapshot versions
-      id: check
+    - id: check
+      shell: bash
       env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
         MANIFEST_PATH: ${{ inputs.manifest-path }}
         ASSEMBLY_INFO_PATH: ${{ inputs.assembly-info-path }}
-      shell: pwsh
-      run: |
-        $eligible = $false
-        try {
-          $manifest = Get-Content -LiteralPath $env:MANIFEST_PATH -Raw | ConvertFrom-Json
-          $assemblyInfo = Get-Content -LiteralPath $env:ASSEMBLY_INFO_PATH -Raw
-          $assemblyVersionMatches = [regex]::Matches($assemblyInfo, '(?m)^\s*\[assembly:\s*AssemblyInformationalVersion\("([^"]+)"\)\]')
-          $eligible = $assemblyVersionMatches.Count -eq 1 -and
-            $manifest.version_number -cmatch '^\d+\.\d+\.\d+-snapshot$' -and
-            $manifest.version_number -ceq $assemblyVersionMatches[0].Groups[1].Value
-        } catch {
-          Write-Host "Snapshot metadata could not be read: $_"
-        }
-        "eligible=$($eligible.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-        if (-not $eligible) {
-          'Snapshot skipped: AssemblyInformationalVersion and version_number must be identical and end with -snapshot.' >> $env:GITHUB_STEP_SUMMARY
-        }
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/check-snapshot.sh"

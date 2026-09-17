@@ -2,7 +2,7 @@
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
-## Shared organization references (v3)
+## Shared organization references (v4)
 
 All mods use the same private reference bundle in
 `landoria-gaming/LandoriaModReferences`, containing Valheim/Unity managed DLLs
@@ -20,7 +20,8 @@ success with a two-hour download grace period. Expired references are regenerate
 - `build-snapshot`: builds with the mod's HarmonyValidator and calls its PackageThunderstore target. Reference versions and source run are recorded in build metadata.
 - `publish-snapshot`: updates the snapshot prerelease and its stable ZIP assets, only for the current main head.
 
-Composite actions require Windows and PowerShell. The publishing action requires
+Composite actions require Windows, Bash and jq. Compilation, staging and ZIP
+creation use MSBuild targets. PowerShell scripts are not used. The publishing action requires
 GitHub CLI and contents: write. Valheim, Unity, BepInEx and Harmony references
 are never included in mod packages or published publicly.
 
@@ -39,7 +40,7 @@ jobs:
   snapshot:
     permissions:
       contents: write
-    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v3
+    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4
     with:
       project-file: Landoria.FirstPerson.csproj
       mod-name: Landoria.FirstPerson
@@ -67,5 +68,6 @@ Snapshot artifacts are retained 30 days. Only main push/manual builds publish.
 All opted-in mods select the same central source; a central update does not
 rebuild the mods automatically or change their own versions.
 
-Version v3 adds on-demand checks and main-only trusted builds. v2 used scheduled
+Version v4 uses Bash orchestration and MSBuild archive tasks. Version v3 adds
+on-demand checks and main-only trusted builds. v2 used scheduled
 central updates; v1 used repository-local caches. Earlier tags are retained.

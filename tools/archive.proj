@@ -1,0 +1,18 @@
+<Project>
+  <Target Name="Zip">
+    <Error Condition="'$(SourceDirectory)' == '' Or '$(DestinationFile)' == ''" Text="SourceDirectory and DestinationFile are required." />
+    <ZipDirectory SourceDirectory="$(SourceDirectory)" DestinationFile="$(DestinationFile)" Overwrite="true" />
+  </Target>
+  <Target Name="StageSnapshot">
+    <Error Condition="'$(ModRoot)' == '' Or '$(ModName)' == ''" Text="ModRoot and ModName are required." />
+    <ItemGroup>
+      <SnapshotFiles Include="$(ModRoot)/bin/Release/$(ModName).dll;$(ModRoot)/manifest.json;$(ModRoot)/icon.png;$(ModRoot)/README.md" />
+      <SnapshotFiles Include="$(ModRoot)/CHANGELOG.md" Condition="Exists('$(ModRoot)/CHANGELOG.md')" />
+      <SnapshotFiles Include="$(ModRoot)/LICENSE" Condition="Exists('$(ModRoot)/LICENSE')" />
+      <SnapshotFiles Include="$(ReferenceMetadata)" />
+    </ItemGroup>
+    <RemoveDir Directories="$(ModRoot)/bin/snapshot" />
+    <MakeDir Directories="$(ModRoot)/bin/snapshot" />
+    <Copy SourceFiles="@(SnapshotFiles)" DestinationFolder="$(ModRoot)/bin/snapshot" />
+  </Target>
+</Project>

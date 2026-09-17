@@ -1,66 +1,18 @@
 name: Build snapshot
-description: Build with Harmony validation and package via the caller MSBuild target
+description: Build and package through MSBuild, with Bash orchestration
 inputs:
   project-file:
     description: Mod project file relative to repository root
     required: true
   mod-name:
-    description: Assembly name such as Landoria.FirstPerson
+    description: Mod assembly name
     required: true
 runs:
   using: composite
   steps:
-    - name: Build and validate Harmony targets
+    - shell: bash
       env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
         PROJECT_FILE: ${{ inputs.project-file }}
         MOD_NAME: ${{ inputs.mod-name }}
-      shell: pwsh
-      run: |
-        New-Item -ItemType Directory -Path obj -Force | Out-Null
-        dotnet build $env:PROJECT_FILE -c Release --nologo -p:Platform=AnyCPU -v minimal /fl '/flp:logfile=obj/snapshot-build.log;verbosity=normal'
-        if ($LASTEXITCODE -ne 0) {
-          throw "Build failed with exit code $LASTEXITCODE."
-        }
-
-    - name: Package snapshot
-      env:
-        PROJECT_FILE: ${{ inputs.project-file }}
-        MOD_NAME: ${{ inputs.mod-name }}
-      shell: pwsh
-      run: |
-        $snapshot = 'bin/snapshot'
-        New-Item -ItemType Directory -Path $snapshot -Force | Out-Null
-        Copy-Item -LiteralPath "bin/Release/$env:MOD_NAME.dll", 'manifest.json', 'icon.png', 'README.md' -Destination $snapshot
-        foreach ($optional in 'CHANGELOG.md', 'LICENSE') {
-          if (Test-Path -LiteralPath $optional) { Copy-Item -LiteralPath $optional -Destination $snapshot }
-        }
-        $dll = Get-Item -LiteralPath "$snapshot/$env:MOD_NAME.dll"
-        if ($dll.Length -eq 0) {
-          throw 'The compiled DLL is empty.'
-        }
-        Copy-Item -LiteralPath "$env:RUNNER_TEMP/snapshot-dependencies/valheim-appmanifest.acf" -Destination "$snapshot/valheim-appmanifest.acf"
-        [ordered]@{
-          kind = 'snapshot'
-          commit = (git rev-parse HEAD)
-          run = $env:GITHUB_RUN_ID
-          attempt = $env:GITHUB_RUN_ATTEMPT
-          builtUtc = [DateTime]::UtcNow.ToString('O')
-          framework = '.NET Framework 4.8'
-          platform = 'AnyCPU'
-          configuration = 'Release'
-            bepinexVersion = $env:BEPINEX_VERSION
-            valheimVersion = $env:VALHEIM_VERSION
-            referenceRun = $env:REFERENCE_RUN_ID
-          dllSha256 = (Get-FileHash -LiteralPath $dll.FullName -Algorithm SHA256).Hash
-        } | ConvertTo-Json | Set-Content -LiteralPath "$snapshot/build-info.json" -Encoding utf8
-
-    - name: Package Thunderstore archive
-      env:
-        PROJECT_FILE: ${{ inputs.project-file }}
-        MOD_NAME: ${{ inputs.mod-name }}
-      shell: pwsh
-      run: |
-        dotnet build $env:PROJECT_FILE -c Release --no-restore --nologo -t:PackageThunderstore -p:Platform=AnyCPU -p:SnapshotBuild=true
-        if ($LASTEXITCODE -ne 0) {
-          throw "Thunderstore packaging failed with exit code $LASTEXITCODE."
-        }
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/build-snapshot.sh"

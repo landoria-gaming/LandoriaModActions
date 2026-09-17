@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$MOD_NAME" =~ ^[A-Za-z0-9_.-]+$ ]] || exit 1
+tools=$(cd "$(dirname "$0")" && pwd)
+native_path() { cygpath -m "$1"; }
+mkdir -p obj
+dotnet build "$PROJECT_FILE" -c Release --nologo -p:Platform=AnyCPU -v minimal -fl '-flp:logfile=obj/snapshot-build.log;verbosity=normal'
+temp=$(cygpath -u "$RUNNER_TEMP")
+dotnet msbuild "$(native_path "$tools/archive.proj")" -t:StageSnapshot \
+  "-p:ModRoot=$(native_path "$PWD")" "-p:ModName=$MOD_NAME" \
+  "-p:ReferenceMetadata=$(native_path "$temp/snapshot-dependencies/valheim-appmanifest.acf")"
+[[ -s "bin/snapshot/$MOD_NAME.dll" ]] || exit 1
+hash=$(sha256sum "bin/snapshot/$MOD_NAME.dll"); hash=${hash%% *}
+jq -n --arg commit "$(git rev-parse HEAD | tr -d '\r')" --arg run "$GITHUB_RUN_ID" \
+  --arg attempt "$GITHUB_RUN_ATTEMPT" --arg utc "$(date -u +%FT%TZ)" \
+  --arg bepinex "$BEPINEX_VERSION" --arg valheim "$VALHEIM_VERSION" \
+  --arg references "$REFERENCE_RUN_ID" --arg hash "$hash" \
+  '{kind:"snapshot",commit:$commit,run:$run,attempt:$attempt,builtUtc:$utc,framework:".NET Framework 4.8",platform:"AnyCPU",configuration:"Release",bepinexVersion:$bepinex,valheimVersion:$valheim,referenceRun:$references,dllSha256:$hash}' > bin/snapshot/build-info.json
+dotnet build "$PROJECT_FILE" -c Release --no-restore --nologo -t:PackageThunderstore -p:Platform=AnyCPU -p:SnapshotBuild=true
