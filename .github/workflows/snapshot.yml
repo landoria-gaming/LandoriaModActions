@@ -34,7 +34,7 @@ jobs:
         with:
           persist-credentials: false
       - id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v4
+        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v4.1
   build:
     needs: eligibility
     if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
@@ -49,12 +49,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.1
         with:
           references-repository: ${{ inputs.references-repository }}
           token: ${{ secrets.references-token }}
       - name: Build and package snapshot
-        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v4
+        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v4.1
         with:
           project-file: ${{ inputs.project-file }}
           mod-name: ${{ inputs.mod-name }}
@@ -96,17 +96,17 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Download Thunderstore package
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1 (Node.js 24)
         with:
           name: ${{ inputs.mod-name }}-thunderstore-${{ github.sha }}-${{ github.run_attempt }}
           path: thunderstore
       - name: Download snapshot files
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1 (Node.js 24)
         with:
           name: ${{ inputs.mod-name }}-snapshot-${{ github.sha }}-${{ github.run_attempt }}
           path: snapshot
       - name: Replace snapshot release
-        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v4
+        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v4.1
         with:
           mod-name: ${{ inputs.mod-name }}
           package-name: ${{ inputs.package-name }}
