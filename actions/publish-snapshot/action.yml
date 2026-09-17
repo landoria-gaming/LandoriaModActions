@@ -1,0 +1,68 @@
+name: Publish rolling snapshot
+description: Replace the snapshot prerelease only from current main
+inputs:
+  mod-name:
+    description: Assembly name
+    required: true
+  package-name:
+    description: Thunderstore package name without Landoria prefix
+    required: true
+  token:
+    description: GitHub token with contents write permission
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Replace snapshot release
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        MOD_NAME: ${{ inputs.mod-name }}
+        PACKAGE_NAME: ${{ inputs.package-name }}
+        GH_REPO: ${{ github.repository }}
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        if ($env:GITHUB_REF -ne 'refs/heads/main' -or $env:GITHUB_EVENT_NAME -notin @('push', 'workflow_dispatch')) {
+          throw 'Snapshot publication is restricted to main push and manual runs.'
+        }
+        if ($env:MOD_NAME -notmatch '^[A-Za-z0-9_.-]+$' -or $env:PACKAGE_NAME -notmatch '^[A-Za-z0-9_]+$') {
+          throw 'Invalid mod or package name.'
+        }
+        function Invoke-Gh {
+          & gh @args
+          if ($LASTEXITCODE -ne 0) { throw "GitHub CLI failed: $($args -join ' ')" }
+        }
+        # Do not let a rerun of an older commit replace the current main snapshot.
+        $mainCommit = Invoke-Gh api "repos/$env:GH_REPO/git/ref/heads/main" --jq '.object.sha'
+        if ($mainCommit -ne $env:GITHUB_SHA) {
+          'Snapshot release skipped: this commit is no longer the main branch head.' >> $env:GITHUB_STEP_SUMMARY
+          exit 0
+        }
+        $packages = @(Get-ChildItem -LiteralPath thunderstore -Filter '*.zip')
+        if ($packages.Count -ne 1) { throw 'Expected exactly one Thunderstore ZIP.' }
+        New-Item -ItemType Directory -Path release -Force | Out-Null
+        Copy-Item -LiteralPath $packages[0].FullName -Destination "release/Landoria-$env:PACKAGE_NAME-snapshot.zip"
+        Compress-Archive -Path 'snapshot/*' -DestinationPath "release/$env:MOD_NAME-snapshot.zip"
+        $version = (Get-Content -LiteralPath 'snapshot/manifest.json' -Raw | ConvertFrom-Json).version_number
+        $notes = "Latest development snapshot from main. Replaced after each successful snapshot build.`n`nVersion: $version`nCommit: $env:GITHUB_SHA`nBuild: $env:GITHUB_SERVER_URL/$env:GH_REPO/actions/runs/$env:GITHUB_RUN_ID"
+        & gh api "repos/$env:GH_REPO/git/ref/tags/snapshot" --silent 2>$null
+        if ($LASTEXITCODE -eq 0) {
+          Invoke-Gh api --method PATCH "repos/$env:GH_REPO/git/refs/tags/snapshot" -f "sha=$env:GITHUB_SHA" -F force=true --silent
+        } else {
+          Invoke-Gh api --method POST "repos/$env:GH_REPO/git/refs" -f ref=refs/tags/snapshot -f "sha=$env:GITHUB_SHA" --silent
+        }
+        & gh release view snapshot --json id 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+          Invoke-Gh release edit snapshot --title 'Snapshot' --notes $notes --prerelease --latest=false
+        } else {
+          Invoke-Gh release create snapshot --verify-tag --title 'Snapshot' --notes $notes --prerelease --latest=false
+        }
+        Invoke-Gh release upload snapshot "release/Landoria-$env:PACKAGE_NAME-snapshot.zip" "release/$env:MOD_NAME-snapshot.zip" --clobber
+        # Remove obsolete versioned assets, but only after the new files are uploaded.
+        $assets = Invoke-Gh release view snapshot --json assets | ConvertFrom-Json
+        foreach ($asset in $assets.assets) {
+          if ($asset.name -notin @("Landoria-$env:PACKAGE_NAME-snapshot.zip", "$env:MOD_NAME-snapshot.zip")) {
+            Invoke-Gh release delete-asset snapshot $asset.name --yes
+          }
+        }
+        "Snapshot release: $env:GITHUB_SERVER_URL/$env:GH_REPO/releases/tag/snapshot" >> $env:GITHUB_STEP_SUMMARY

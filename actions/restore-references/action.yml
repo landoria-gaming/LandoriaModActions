@@ -1,0 +1,71 @@
+name: Restore compilation references
+description: Restore and validate Valheim and BepInEx caches without downloading them
+inputs:
+  config-path:
+    description: Reference configuration JSON in the caller repository
+    default: build/valheim-references.json
+runs:
+  using: composite
+  steps:
+    - name: Read reference configuration
+      id: references
+      env:
+        REFERENCE_CONFIG: ${{ inputs.config-path }}
+      shell: pwsh
+      run: |
+        $config = Get-Content -LiteralPath $env:REFERENCE_CONFIG -Raw | ConvertFrom-Json
+        "key=valheim-managed-windows-$($config.version)-r$($config.cache_revision)" >> $env:GITHUB_OUTPUT
+        "bepinex-key=bepinex-valheim-$($config.bepinex_version)-r$($config.cache_revision)" >> $env:GITHUB_OUTPUT
+        "BEPINEX_VERSION=$($config.bepinex_version)" >> $env:GITHUB_ENV
+
+    - name: Restore Valheim managed DLLs
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/valheim-references
+        key: ${{ steps.references.outputs.key }}
+        fail-on-cache-miss: true
+
+    - name: Restore BepInEx references
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ runner.temp }}/bepinex-references
+        key: ${{ steps.references.outputs.bepinex-key }}
+        fail-on-cache-miss: true
+
+    # Populate missing caches with Cache compilation dependencies on main.
+    # Compilation references are never included in the snapshot packages.
+    - name: Validate cached compilation dependencies
+      env:
+        REFERENCE_CONFIG: ${{ inputs.config-path }}
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $dependencies = Join-Path $env:RUNNER_TEMP 'snapshot-dependencies'
+        $references = Join-Path $env:RUNNER_TEMP 'valheim-references'
+        $managed = Join-Path $references 'valheim_Data/Managed'
+        New-Item -ItemType Directory -Path $dependencies -Force | Out-Null
+        $referenceManifest = Get-Content -LiteralPath "$references/build-references.json" -Raw | ConvertFrom-Json
+        $config = Get-Content -LiteralPath $env:REFERENCE_CONFIG -Raw | ConvertFrom-Json
+        if ($referenceManifest.version -ne $config.version) { throw 'Cached Valheim version does not match configuration.' }
+        foreach ($file in $referenceManifest.files) {
+          if ($file.name -notmatch '^[A-Za-z0-9_.-]+\.dll$') { throw 'Invalid cached reference filename.' }
+          if ((Get-FileHash -LiteralPath "$managed/$($file.name)" -Algorithm SHA256).Hash -ne $file.sha256) {
+            throw "Cached reference hash mismatch: $($file.name)"
+          }
+        }
+        $bepinexReferences = Join-Path $env:RUNNER_TEMP 'bepinex-references'
+        $bepinex = Join-Path $bepinexReferences 'BepInEx'
+        $bepinexManifest = Get-Content -LiteralPath "$bepinexReferences/build-references.json" -Raw | ConvertFrom-Json
+        if ($bepinexManifest.version -ne $config.bepinex_version) { throw 'Cached BepInEx version does not match configuration.' }
+        foreach ($file in $bepinexManifest.files) {
+          if ($file.name -notin @('BepInEx.dll', '0Harmony.dll')) { throw 'Invalid cached BepInEx reference filename.' }
+          if ((Get-FileHash -LiteralPath "$bepinex/core/$($file.name)" -Algorithm SHA256).Hash -ne $file.sha256) {
+            throw "Cached BepInEx reference hash mismatch: $($file.name)"
+          }
+        }
+        foreach ($file in @("$bepinex/core/BepInEx.dll", "$bepinex/core/0Harmony.dll", "$managed/assembly_valheim.dll", "$managed/netstandard.dll")) {
+          if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Missing reference: $file" }
+        }
+        "BepInExPath=$bepinex" >> $env:GITHUB_ENV
+        "ValheimGamePath=$references" >> $env:GITHUB_ENV
+        Copy-Item -LiteralPath "$references/valheim-appmanifest.acf" -Destination "$dependencies/valheim-appmanifest.acf"

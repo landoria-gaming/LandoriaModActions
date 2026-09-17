@@ -1,0 +1,131 @@
+name: Snapshot build
+
+on:
+  workflow_call:
+    inputs:
+      project-file:
+        required: true
+        type: string
+      mod-name:
+        required: true
+        type: string
+      package-name:
+        required: true
+        type: string
+      config-path:
+        default: build/valheim-references.json
+        type: string
+      publish:
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  eligibility:
+    name: Check snapshot versions
+    runs-on: windows-2022
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Compare snapshot versions
+        id: check
+        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v1
+  build:
+    needs: eligibility
+    if: needs.eligibility.outputs.eligible == 'true'
+    name: .NET Framework 4.8 / AnyCPU
+    runs-on: windows-2022
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore compilation references
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v1
+        with:
+          config-path: ${{ inputs.config-path }}
+
+
+      - name: Build and package snapshot
+        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v1
+        with:
+          project-file: ${{ inputs.project-file }}
+          mod-name: ${{ inputs.mod-name }}
+
+
+      - name: Upload Thunderstore archive
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.mod-name }}-thunderstore-${{ github.sha }}-${{ github.run_attempt }}
+          path: bin/thunderstore/*.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload snapshot
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.mod-name }}-snapshot-${{ github.sha }}-${{ github.run_attempt }}
+          path: bin/snapshot/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ inputs.mod-name }}-build-log-${{ github.run_id }}-${{ github.run_attempt }}
+          path: obj/snapshot-build.log
+          if-no-files-found: ignore
+          retention-days: 30
+
+  publish:
+    name: Update snapshot prerelease
+    needs: build
+    if: inputs.publish && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: windows-2022
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      group: snapshot-release
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Download Thunderstore package
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.mod-name }}-thunderstore-${{ github.sha }}-${{ github.run_attempt }}
+          path: thunderstore
+
+      - name: Download snapshot files
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ inputs.mod-name }}-snapshot-${{ github.sha }}-${{ github.run_attempt }}
+          path: snapshot
+
+      - name: Replace snapshot release
+        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v1
+        with:
+          mod-name: ${{ inputs.mod-name }}
+          package-name: ${{ inputs.package-name }}
+          token: ${{ github.token }}
