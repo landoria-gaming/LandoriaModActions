@@ -36,3 +36,10 @@ if ($restore -match 'steamcmd|Invoke-WebRequest|actions/cache/save') {
     throw 'Restore action must never download or save compilation dependencies.'
 }
 Write-Output 'Restore-only dependency policy passed.'
+
+foreach ($tool in Get-ChildItem -LiteralPath "$repository/tools" -Filter '*.ps1') {
+    $tokens = $null
+    $errors = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($tool.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+    if ($errors.Count) { throw ($errors | Out-String) }
+}

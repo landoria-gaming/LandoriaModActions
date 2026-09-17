@@ -18,8 +18,3 @@ jobs:
       - name: Test action scripts
         shell: pwsh
         run: ./tests/Test-Actions.ps1
-      - name: Build game version reader
-        shell: pwsh
-        run: |
-          dotnet build tools/ValheimGameVersion/ValheimGameVersion.csproj -c Release --nologo
-          if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }

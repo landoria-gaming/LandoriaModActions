@@ -2,17 +2,26 @@
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
+## Shared organization references (v2)
+
+All mods use the same private reference bundle in
+`landoria-gaming/LandoriaModReferences`, containing Valheim/Unity managed DLLs
+and BepInEx/Harmony compilation references. No per-mod cache or dependency
+update job is used. Only the private central repository checks Steam daily,
+downloads new builds and removes previous bundles after successful replacement.
+
 ## Actions
 
-- `check-snapshot`: compares AssemblyInformationalVersion and manifest version_number; both must be identical X.Y.Z-snapshot.
-- `cache-references`: downloads the dedicated server and BepInExPack once; caches only managed DLLs and hash metadata.
-- `restore-references`: restores both caches, verifies versions and hashes, exports ValheimGamePath and BepInExPath.
-- `build-snapshot`: builds a root-level .NET Framework 4.8 project with its HarmonyValidator and calls its PackageThunderstore MSBuild target.
-- `publish-snapshot`: updates the rolling snapshot prerelease, tag and two stable ZIP assets. Only the current main head may publish.
+- `check-snapshot`: both AssemblyInformationalVersion and version_number must equal X.Y.Z-snapshot.
+- `restore-references`: selects the latest successful central reference bundle, downloads it with a read-only token, verifies all DLL hashes and exports build paths.
+- `build-snapshot`: builds with the mod's HarmonyValidator and calls its PackageThunderstore target. Reference versions and source run are recorded in build metadata.
+- `publish-snapshot`: updates the snapshot prerelease and its stable ZIP assets, only for the current main head.
 
-All composite actions require a Windows runner and PowerShell. The publishing action requires gh and contents: write; call it only in a trusted main job. No game, Unity, BepInEx or Harmony DLL is distributed in the mod ZIP.
+Composite actions require Windows and PowerShell. The publishing action requires
+GitHub CLI and contents: write. Valheim, Unity, BepInEx and Harmony references
+are never included in mod packages or published publicly.
 
-## Reusable workflows
+## Consumer workflow
 
 ```yaml
 name: Snapshot build
@@ -27,25 +36,33 @@ jobs:
   snapshot:
     permissions:
       contents: write
-    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v1
+    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v2
     with:
       project-file: Landoria.FirstPerson.csproj
       mod-name: Landoria.FirstPerson
       package-name: FirstPerson
+    secrets:
+      references-token: ${{ secrets.MOD_REFERENCES_TOKEN }}
 ```
 
-The reusable workflow grants write permission only to the main publishing job; eligibility and builds remain read-only. Fork PR permissions are read-only. Set publish: false to disable releases.
+Create organization secret `MOD_REFERENCES_TOKEN`, available only to the mod
+repositories. Use a fine-grained PAT with Actions: read and Metadata: read
+restricted to the private LandoriaModReferences repository, or an equivalent
+GitHub App installation token. Ordinary mod GITHUB_TOKEN cannot access it.
+Do not reuse an administrator token or expose reference files in public artifacts.
 
-A second manual caller invokes `.github/workflows/cache-references.yml@v1` with contents: read. Run it on main before building, and again after cache eviction.
+Fork pull requests skip builds because private reference secrets are unavailable;
+never use pull_request_target to execute untrusted source with this token.
+Same-repository PRs can build using the read-only token. Missing credentials on
+trusted runs fail explicitly. The workflow keeps build and eligibility jobs
+read-only and grants write access only to the main release job. Set publish: false
+to disable rolling releases.
 
-Caller configuration (default `build/valheim-references.json`):
+The caller retains PackageThunderstore and version metadata. Files are at repository
+root, DLL output is bin/Release/<mod-name>.dll. No suffix is added automatically.
+Snapshot artifacts are retained 30 days. Only main push/manual builds publish.
+All opted-in mods select the same central source; a central update does not
+rebuild the mods automatically or change their own versions.
 
-```json
-{"version":"1.0.12","steam_app_id":896660,"steam_beta":"public","bepinex_version":"5.4.2350","cache_revision":1}
-```
-
-Caches belong to the calling mod repository, not this repository. GitHub may evict unused caches after 7 days; caches are not permanent storage. Increase cache_revision to create fresh immutable entries. The archive workflow checks the actual downloaded game version and fails rather than caching mismatched DLLs. An old game version cannot be downloaded from a beta that no longer serves it.
-
-The mod retains its local PackageThunderstore target and source version files. No suffix is added automatically. Package files must be at repository root; DLL output must be bin/Release/<mod-name>.dll. Artifacts are retained 30 days. Only main push/manual builds publish.
-
-The v1 tag identifies this API. Workflow and composite actions use the same tag; advance it deliberately for compatible updates.
+Version v2 introduces the private global store; v1 is retained for compatibility
+and used repository-local caches. Advance API tags deliberately for compatible updates.

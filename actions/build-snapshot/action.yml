@@ -48,7 +48,9 @@ runs:
           framework = '.NET Framework 4.8'
           platform = 'AnyCPU'
           configuration = 'Release'
-          bepinexVersion = $env:BEPINEX_VERSION
+            bepinexVersion = $env:BEPINEX_VERSION
+            valheimVersion = $env:VALHEIM_VERSION
+            referenceRun = $env:REFERENCE_RUN_ID
           dllSha256 = (Get-FileHash -LiteralPath $dll.FullName -Algorithm SHA256).Hash
         } | ConvertTo-Json | Set-Content -LiteralPath "$snapshot/build-info.json" -Encoding utf8
 

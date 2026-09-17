@@ -12,12 +12,17 @@ on:
       package-name:
         required: true
         type: string
-      config-path:
-        default: build/valheim-references.json
+      references-repository:
+        default: landoria-gaming/LandoriaModReferences
         type: string
       publish:
         default: true
         type: boolean
+
+    secrets:
+      references-token:
+        description: Read-only access to the private organization reference repository
+        required: false
 
 permissions:
   contents: read
@@ -36,10 +41,10 @@ jobs:
 
       - name: Compare snapshot versions
         id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v1
+        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v2
   build:
     needs: eligibility
-    if: needs.eligibility.outputs.eligible == 'true'
+    if: needs.eligibility.outputs.eligible == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     name: .NET Framework 4.8 / AnyCPU
     runs-on: windows-2022
     timeout-minutes: 45
@@ -59,13 +64,14 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v1
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v2
         with:
-          config-path: ${{ inputs.config-path }}
+          references-repository: ${{ inputs.references-repository }}
+          token: ${{ secrets.references-token }}
 
 
       - name: Build and package snapshot
-        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v1
+        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v2
         with:
           project-file: ${{ inputs.project-file }}
           mod-name: ${{ inputs.mod-name }}
@@ -124,7 +130,7 @@ jobs:
           path: snapshot
 
       - name: Replace snapshot release
-        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v1
+        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v2
         with:
           mod-name: ${{ inputs.mod-name }}
           package-name: ${{ inputs.package-name }}
