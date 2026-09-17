@@ -5,33 +5,20 @@ inputs:
     description: Private shared reference repository
     default: landoria-gaming/LandoriaModReferences
   token:
-    description: Token with Actions read access to the shared private repository
+    description: Dedicated token with Actions write access to the shared private repository only
     required: true
 runs:
   using: composite
   steps:
-    - name: Select latest successful shared references
+    - name: Check shared references on demand and wait for validation
       id: references
       shell: pwsh
       env:
         GH_TOKEN: ${{ inputs.token }}
         REFERENCE_REPOSITORY: ${{ inputs.references-repository }}
+        ACTION_DIRECTORY: ${{ github.action_path }}
       run: |
-        $ErrorActionPreference = 'Stop'
-        if (-not $env:GH_TOKEN) { throw 'Configure the MOD_REFERENCES_TOKEN organization secret with Actions read access to LandoriaModReferences.' }
-        if ($env:REFERENCE_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') { throw 'Invalid reference repository name.' }
-        $json = gh api "repos/$env:REFERENCE_REPOSITORY/actions/workflows/update-references.yml/runs?status=success&branch=main&per_page=10"
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot read shared reference workflows; check the read token permissions.' }
-        $runs = ($json | ConvertFrom-Json).workflow_runs
-        $runId = ''
-        foreach ($run in $runs) {
-          $json = gh api "repos/$env:REFERENCE_REPOSITORY/actions/runs/$($run.id)/artifacts"
-          if ($LASTEXITCODE -ne 0) { throw 'Shared artifact lookup failed.' }
-          $bundle = ($json | ConvertFrom-Json).artifacts | Where-Object { $_.name -eq 'mod-compilation-references' -and -not $_.expired }
-          if (@($bundle).Count -eq 1) { $runId = $run.id; break }
-        }
-        if (-not $runId) { throw 'No shared reference bundle available; run Update shared references in LandoriaModReferences.' }
-        "run-id=$runId" >> $env:GITHUB_OUTPUT
+        & "$env:ACTION_DIRECTORY/../../tools/Request-References.ps1" -Repository $env:REFERENCE_REPOSITORY
 
     - name: Download the common reference bundle
       uses: actions/download-artifact@v5

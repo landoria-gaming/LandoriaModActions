@@ -36,6 +36,10 @@ if ($restore -match 'steamcmd|Invoke-WebRequest|actions/cache/save') {
     throw 'Restore action must never download or save compilation dependencies.'
 }
 Write-Output 'Restore-only dependency policy passed.'
+& "$PSScriptRoot/Test-RequestReferences.ps1"
+$workflow = Get-Content -LiteralPath "$repository/.github/workflows/snapshot.yml" -Raw
+if ($workflow -notmatch "github.ref == 'refs/heads/main'" -or
+    $workflow -match 'pull_request.head.repo') { throw 'Reference builds must be restricted to trusted main events.' }
 
 foreach ($tool in Get-ChildItem -LiteralPath "$repository/tools" -Filter '*.ps1') {
     $tokens = $null

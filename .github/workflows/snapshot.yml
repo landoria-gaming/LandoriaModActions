@@ -21,7 +21,7 @@ on:
 
     secrets:
       references-token:
-        description: Read-only access to the private organization reference repository
+        description: Dedicated Actions write token restricted to the private reference repository
         required: false
 
 permissions:
@@ -41,13 +41,13 @@ jobs:
 
       - name: Compare snapshot versions
         id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v2
+        uses: landoria-gaming/LandoriaModActions/actions/check-snapshot@v3
   build:
     needs: eligibility
-    if: needs.eligibility.outputs.eligible == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     name: .NET Framework 4.8 / AnyCPU
     runs-on: windows-2022
-    timeout-minutes: 45
+    timeout-minutes: 70
     defaults:
       run:
         shell: pwsh
@@ -64,14 +64,14 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v2
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v3
         with:
           references-repository: ${{ inputs.references-repository }}
           token: ${{ secrets.references-token }}
 
 
       - name: Build and package snapshot
-        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v2
+        uses: landoria-gaming/LandoriaModActions/actions/build-snapshot@v3
         with:
           project-file: ${{ inputs.project-file }}
           mod-name: ${{ inputs.mod-name }}
@@ -130,7 +130,7 @@ jobs:
           path: snapshot
 
       - name: Replace snapshot release
-        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v2
+        uses: landoria-gaming/LandoriaModActions/actions/publish-snapshot@v3
         with:
           mod-name: ${{ inputs.mod-name }}
           package-name: ${{ inputs.package-name }}
