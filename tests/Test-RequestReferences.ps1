@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $originalToken = $env:GH_TOKEN
 $originalOutput = $env:GITHUB_OUTPUT
+$originalExitCode = $global:LASTEXITCODE
 $testOutput = [System.IO.Path]::GetTempFileName()
 try {
     $env:GH_TOKEN = 'mock-not-a-real-token'
@@ -39,4 +40,5 @@ try {
     $env:GITHUB_OUTPUT = $originalOutput
     Remove-Item -LiteralPath $testOutput
     Remove-Variable -Name referenceTestScenario -Scope Global
+    $global:LASTEXITCODE = $originalExitCode
 }
