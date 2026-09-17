@@ -25,6 +25,43 @@ grep -q 'eligible=false' "$GITHUB_OUTPUT"
 printf '{broken json' > "$MANIFEST_PATH"
 bash "$root/tools/check-snapshot.sh"
 
+check_release() {
+  printf '{"version_number":"%s"}\n' "$1" > "$MANIFEST_PATH"
+  printf '[assembly: AssemblyInformationalVersion("%s")]\n' "$2" > "$ASSEMBLY_INFO_PATH"
+  : > "$GITHUB_OUTPUT"
+  bash "$root/tools/check-release.sh"
+  grep -qx "eligible=$3" "$GITHUB_OUTPUT"
+  if [[ "$3" == true ]]; then grep -qx "version=$1" "$GITHUB_OUTPUT"; fi
+}
+check_release 1.0.11 1.0.11 true
+check_release 1.0.12 1.0.11 false
+check_release 1.0.11-snapshot 1.0.11-snapshot false
+check_release 1.0.11 1.0.11-snapshot false
+check_release 1.0.11-draft 1.0.11-draft false
+printf '[assembly: AssemblyInformationalVersion("1.0.11")]\n' >> "$ASSEMBLY_INFO_PATH"
+: > "$GITHUB_OUTPUT"
+bash "$root/tools/check-release.sh"
+grep -qx 'eligible=false' "$GITHUB_OUTPUT"
+printf '{invalid' > "$MANIFEST_PATH"
+bash "$root/tools/check-release.sh"
+
+# MSBuild rejects invalid versions before invoking the mod packaging target.
+mkdir -p "$fixture/Properties"
+cp "$ASSEMBLY_INFO_PATH" "$fixture/Properties/AssemblyInfo.cs"
+printf '%s\n' '<Project><Target Name="PackageThunderstore"><WriteLinesToFile File="$(MSBuildProjectDirectory)/built.txt" Lines="built" /></Target></Project>' > "$fixture/ReleaseTest.proj"
+release_project=$(cygpath -m "$root/tools/release.proj")
+mod_project=$(cygpath -m "$fixture/ReleaseTest.proj")
+printf '{"version_number":"1.0.11"}\n' > "$MANIFEST_PATH"
+printf '[assembly: AssemblyInformationalVersion("1.0.11")]\n' > "$fixture/Properties/AssemblyInfo.cs"
+dotnet msbuild "$release_project" -t:PackageRelease "-p:ModProject=$mod_project"
+[[ -f "$fixture/built.txt" ]]
+rm "$fixture/built.txt"
+for version in 1.0.12 1.0.11-snapshot; do
+  printf '{"version_number":"%s"}\n' "$version" > "$MANIFEST_PATH"
+  if dotnet msbuild "$release_project" -t:PackageRelease "-p:ModProject=$mod_project"; then exit 1; fi
+  [[ ! -f "$fixture/built.txt" ]]
+done
+
 # Mock the API, never make a real dispatch in tests.
 gh() {
   if [[ "$*" == *'/dispatches'* ]]; then

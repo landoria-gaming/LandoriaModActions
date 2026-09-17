@@ -1,0 +1,26 @@
+name: Check release versions
+description: Skip unless both versions are identical stable versions
+inputs:
+  manifest-path:
+    description: Package manifest path
+    default: manifest.json
+  assembly-info-path:
+    description: AssemblyInfo source path
+    default: Properties/AssemblyInfo.cs
+outputs:
+  eligible:
+    description: Whether a stable package can be built
+    value: ${{ steps.check.outputs.eligible }}
+  version:
+    description: Validated package version
+    value: ${{ steps.check.outputs.version }}
+runs:
+  using: composite
+  steps:
+    - id: check
+      shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        MANIFEST_PATH: ${{ inputs.manifest-path }}
+        ASSEMBLY_INFO_PATH: ${{ inputs.assembly-info-path }}
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/check-release.sh"

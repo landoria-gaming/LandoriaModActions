@@ -1,5 +1,8 @@
 # Landoria Mod Actions
 
+Manual `Release package` builds one Thunderstore ZIP when both versions match X.Y.Z.
+The ZIP is a workflow artifact; no GitHub release or tag is created.
+
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
 ## Shared organization references (v4.3)

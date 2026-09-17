@@ -1,0 +1,59 @@
+name: Release package
+on:
+  workflow_call:
+    inputs:
+      project-file:
+        required: true
+        type: string
+      mod-name:
+        required: true
+        type: string
+      references-repository:
+        default: landoria-gaming/LandoriaModReferences
+        type: string
+    secrets:
+      references-token:
+        required: false
+permissions:
+  contents: read
+jobs:
+  eligibility:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    outputs:
+      eligible: ${{ steps.check.outputs.eligible }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - id: check
+        uses: landoria-gaming/LandoriaModActions/actions/check-release@v4.4
+  package:
+    needs: eligibility
+    if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restore compilation references
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.4
+        with:
+          references-repository: ${{ inputs.references-repository }}
+          token: ${{ secrets.references-token }}
+      - name: Build release ZIP
+        uses: landoria-gaming/LandoriaModActions/actions/build-release@v4.4
+        with:
+          project-file: ${{ inputs.project-file }}
+      - name: Upload release ZIP
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: ${{ inputs.mod-name }}-${{ needs.eligibility.outputs.version }}
+          path: bin/thunderstore/*.zip
+          if-no-files-found: error
+          retention-days: 30

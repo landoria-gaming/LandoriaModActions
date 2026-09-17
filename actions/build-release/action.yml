@@ -1,0 +1,14 @@
+name: Build release ZIP
+description: Validate stable versions and build one Thunderstore ZIP through MSBuild
+inputs:
+  project-file:
+    description: Mod project file relative to repository root
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        PROJECT_FILE: ${{ inputs.project-file }}
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/build-release.sh"

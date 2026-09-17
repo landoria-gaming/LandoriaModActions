@@ -1,0 +1,17 @@
+<Project>
+  <Target Name="ValidateReleaseVersions">
+    <Error Condition="'$(ModProject)' == '' Or !Exists('$(ModProject)')" Text="ModProject must point to the mod project." />
+    <PropertyGroup>
+      <_ModRoot>$([System.IO.Path]::GetDirectoryName('$(ModProject)'))</_ModRoot>
+      <_Manifest>$([System.IO.File]::ReadAllText('$(_ModRoot)/manifest.json'))</_Manifest>
+      <_AssemblyInfo>$([System.IO.File]::ReadAllText('$(_ModRoot)/Properties/AssemblyInfo.cs'))</_AssemblyInfo>
+      <_Version>$([System.Text.RegularExpressions.Regex]::Match('$(_Manifest)', '&quot;version_number&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_Version>
+      <_AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_AssemblyInfo)', '(?m)^\s*\[assembly:\s*AssemblyInformationalVersion\(&quot;([^&quot;]+)&quot;\)\]').Groups[1].Value)</_AssemblyVersion>
+    </PropertyGroup>
+    <Error Condition="!$([System.String]::Equals('$(_Version)', '$(_AssemblyVersion)', System.StringComparison.Ordinal)) Or !$([System.Text.RegularExpressions.Regex]::IsMatch('$(_Version)', '^\d+\.\d+\.\d+$')) Or $([System.Text.RegularExpressions.Regex]::Matches('$(_AssemblyInfo)', '(?m)^\s*\[assembly:\s*AssemblyInformationalVersion\(&quot;([^&quot;]+)&quot;\)\]').Count) != 1"
+           Text="Release versions must be identical X.Y.Z versions without a suffix." />
+  </Target>
+  <Target Name="PackageRelease" DependsOnTargets="ValidateReleaseVersions">
+    <MSBuild Projects="$(ModProject)" Targets="PackageThunderstore" Properties="Configuration=Release;Platform=AnyCPU;SnapshotBuild=false" />
+  </Target>
+</Project>
