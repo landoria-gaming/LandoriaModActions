@@ -4,7 +4,9 @@ set -euo pipefail
 tools=$(cd "$(dirname "$0")" && pwd)
 native_path() { cygpath -m "$1"; }
 mkdir -p obj
-dotnet build "$PROJECT_FILE" -c Release --nologo -p:Platform=AnyCPU -v minimal -fl '-flp:logfile=obj/snapshot-build.log;verbosity=normal'
+printf 'Compilation references: Valheim %s | BepInEx %s | Reference run %s\n' \
+  "$VALHEIM_VERSION" "$BEPINEX_VERSION" "$REFERENCE_RUN_ID" | tee obj/snapshot-build.log
+dotnet build "$PROJECT_FILE" -c Release --nologo -p:Platform=AnyCPU -v minimal -fl '-flp:logfile=obj/snapshot-build.log;verbosity=normal;append'
 temp=$(cygpath -u "$RUNNER_TEMP")
 dotnet msbuild "$(native_path "$tools/archive.proj")" -t:StageSnapshot \
   "-p:ModRoot=$(native_path "$PWD")" "-p:ModName=$MOD_NAME" \

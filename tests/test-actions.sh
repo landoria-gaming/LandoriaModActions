@@ -68,6 +68,16 @@ bash "$root/tools/validate-references.sh" "$fixture"
 printf 'tampered' >> "$fixture/valheim-references/valheim_Data/Managed/assembly_valheim.dll"
 if bash "$root/tools/validate-references.sh" "$fixture"; then echo 'Tampered DLL was accepted.' >&2; exit 1; fi
 
+# Reference versions must reach both the console and saved log before compilation.
+dotnet() { return 1; }
+export -f dotnet
+if (cd "$fixture"; MOD_NAME=Landoria.Test PROJECT_FILE=Test.csproj VALHEIM_VERSION=1.0.12 BEPINEX_VERSION=5.4.2350 REFERENCE_RUN_ID=123 \
+  bash "$root/tools/build-snapshot.sh" > console.log); then exit 1; fi
+unset -f dotnet
+for log in "$fixture/console.log" "$fixture/obj/snapshot-build.log"; do
+  grep -q 'Valheim 1.0.12 | BepInEx 5.4.2350 | Reference run 123' "$log"
+done
+
 # Packaging belongs to MSBuild; stage only the mod DLL, not other build references.
 mkdir -p "$fixture/bin/Release"
 printf 'mod DLL' > "$fixture/bin/Release/Landoria.Test.dll"
