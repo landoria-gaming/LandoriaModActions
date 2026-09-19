@@ -26,6 +26,7 @@ runs:
     - name: Publish package
       shell: bash
       env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
         PACKAGE_FILE: ${{ inputs.package-file }}
         PACKAGE_NAMESPACE: ${{ inputs.package-namespace }}
         THUNDERSTORE_COMMUNITY: ${{ inputs.community }}

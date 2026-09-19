@@ -70,7 +70,7 @@ jobs:
           retention-days: 30
       - name: Promote release to Thunderstore
         if: inputs['promote-to-thunderstore']
-        uses: landoria-gaming/LandoriaModActions/actions/publish-thunderstore@v4.6
+        uses: landoria-gaming/LandoriaModActions/actions/publish-thunderstore@v4.7
         with:
           package-file: bin/thunderstore/*.zip
           package-namespace: ${{ inputs.package-namespace }}
