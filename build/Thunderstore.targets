@@ -1,5 +1,9 @@
 <Project>
-  <PropertyGroup Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+  <PropertyGroup>
+    <_ThunderstoreProjectFullPath>$([System.IO.Path]::GetFullPath('$(ThunderstoreProject)'))</_ThunderstoreProjectFullPath>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_ThunderstoreProjectFullPath)' == '$(MSBuildProjectFullPath)'">
     <SnapshotBuild Condition="'$(SnapshotBuild)' == ''">false</SnapshotBuild>
     <ThunderstoreNamespace Condition="'$(ThunderstoreNamespace)' == ''">Landoria</ThunderstoreNamespace>
     <ThunderstoreOutputPath Condition="'$(ThunderstoreOutputPath)' == ''">$(MSBuildProjectDirectory)\bin\thunderstore</ThunderstoreOutputPath>
@@ -14,16 +18,16 @@
   </PropertyGroup>
 
   <Target Name="CheckSnapshotEligibility"
-          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+          Condition="'$(_ThunderstoreProjectFullPath)' == '$(MSBuildProjectFullPath)'">
     <Message Condition="'$(SnapshotBuild)' == 'true' And '$(_SnapshotEligible)' != 'true'"
              Text="Skipping snapshot: AssemblyInformationalVersion and version_number must be identical and end with -snapshot. Assembly=$(_ThunderstoreInformationalVersion), manifest=$(_ThunderstoreVersion)." Importance="high" />
   </Target>
 
   <Target Name="PackageThunderstore" DependsOnTargets="CheckSnapshotEligibility;_PackageThunderstore"
-          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'" />
+          Condition="'$(_ThunderstoreProjectFullPath)' == '$(MSBuildProjectFullPath)'" />
 
   <Target Name="_PackageThunderstore" DependsOnTargets="$(_ThunderstoreBuildDependency)"
-          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)' And ('$(SnapshotBuild)' != 'true' Or '$(_SnapshotEligible)' == 'true')">
+          Condition="'$(_ThunderstoreProjectFullPath)' == '$(MSBuildProjectFullPath)' And ('$(SnapshotBuild)' != 'true' Or '$(_SnapshotEligible)' == 'true')">
     <PropertyGroup>
       <_ThunderstoreManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\manifest.json'))</_ThunderstoreManifest>
       <_ThunderstoreName>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreManifest)', '&quot;name&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_ThunderstoreName>
@@ -48,7 +52,7 @@
   </Target>
 
   <Target Name="StageSnapshotExtras"
-          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+          Condition="'$(_ThunderstoreProjectFullPath)' == '$(MSBuildProjectFullPath)'">
     <Copy SourceFiles="@(_SnapshotExtraFiles)" DestinationFolder="$(MSBuildProjectDirectory)\bin\snapshot" Condition="'@(_SnapshotExtraFiles)' != ''" />
   </Target>
 </Project>

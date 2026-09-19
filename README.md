@@ -6,7 +6,7 @@ The ZIP is a workflow artifact; no GitHub release or tag is created. Its optiona
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
-## Shared organization references (v4.8)
+## Shared organization references (v4.9)
 
 All mods use the same private reference bundle in
 `landoria-gaming/LandoriaModReferences`, containing Valheim/Unity managed DLLs
@@ -45,7 +45,7 @@ jobs:
   snapshot:
     permissions:
       contents: write
-    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.8
+    uses: landoria-gaming/LandoriaModActions/.github/workflows/snapshot.yml@v4.9
     with:
       project-file: Landoria.FirstPerson.csproj
       mod-name: Landoria.FirstPerson

@@ -175,6 +175,18 @@ dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:StageSnapshot \
 dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:Zip \
   "-p:SourceDirectory=$(cygpath -m "$fixture/bin/snapshot")" "-p:DestinationFile=$(cygpath -m "$fixture/snapshot.zip")"
 [[ -s "$fixture/snapshot.zip" ]]
+
+# Thunderstore packaging accepts the forward-slash project path used by Git Bash.
+printf '%s\n' '<Project><PropertyGroup><TargetPath>$(MSBuildProjectDirectory)\bin\Release\Test.dll</TargetPath></PropertyGroup><Target Name="Build"><MakeDir Directories="$(MSBuildProjectDirectory)\bin\Release" /><WriteLinesToFile File="$(TargetPath)" Lines="test" Overwrite="true" /></Target><Import Project="$(CustomAfterMicrosoftCommonTargets)" /></Project>' > "$fixture/PackageTest.proj"
+printf '{"name":"Test","version_number":"1.0.11"}\n' > "$MANIFEST_PATH"
+printf 'icon' > "$fixture/icon.png"
+printf 'README' > "$fixture/README.md"
+package_project=$(cygpath -m "$fixture/PackageTest.proj")
+dotnet msbuild "$package_project" -t:PackageThunderstore \
+  "-p:CustomAfterMicrosoftCommonTargets=$(cygpath -m "$root/build/Thunderstore.targets")" \
+  "-p:ThunderstoreProject=$package_project"
+[[ -s "$fixture/bin/thunderstore/Landoria-Test-1.0.11.zip" ]]
+
 # Publication keeps only the versioned Thunderstore ZIP, after a successful upload.
 mkdir -p "$fixture/snapshot" "$fixture/thunderstore"
 printf '{"version_number":"1.0.11-snapshot"}\n' > "$fixture/snapshot/manifest.json"
