@@ -1,0 +1,54 @@
+<Project>
+  <PropertyGroup Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+    <SnapshotBuild Condition="'$(SnapshotBuild)' == ''">false</SnapshotBuild>
+    <ThunderstoreNamespace Condition="'$(ThunderstoreNamespace)' == ''">Landoria</ThunderstoreNamespace>
+    <ThunderstoreOutputPath Condition="'$(ThunderstoreOutputPath)' == ''">$(MSBuildProjectDirectory)\bin\thunderstore</ThunderstoreOutputPath>
+    <_ThunderstoreManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\manifest.json'))</_ThunderstoreManifest>
+    <_ThunderstoreName>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreManifest)', '&quot;name&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_ThunderstoreName>
+    <_ThunderstoreVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreManifest)', '&quot;version_number&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_ThunderstoreVersion>
+    <_ThunderstoreAssemblyInfo>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\Properties\AssemblyInfo.cs'))</_ThunderstoreAssemblyInfo>
+    <_ThunderstoreInformationalVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreAssemblyInfo)', '(?m)^\s*\[assembly:\s*AssemblyInformationalVersion\(&quot;([^&quot;]+)&quot;\)\]').Groups[1].Value)</_ThunderstoreInformationalVersion>
+    <_SnapshotEligible>false</_SnapshotEligible>
+    <_SnapshotEligible Condition="'$(_ThunderstoreVersion)' == '$(_ThunderstoreInformationalVersion)' And $([System.Text.RegularExpressions.Regex]::IsMatch('$(_ThunderstoreVersion)', '^\d+\.\d+\.\d+-snapshot$'))">true</_SnapshotEligible>
+    <_ThunderstoreBuildDependency Condition="'$(SnapshotBuild)' != 'true' Or '$(_SnapshotEligible)' == 'true'">Build</_ThunderstoreBuildDependency>
+  </PropertyGroup>
+
+  <Target Name="CheckSnapshotEligibility"
+          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+    <Message Condition="'$(SnapshotBuild)' == 'true' And '$(_SnapshotEligible)' != 'true'"
+             Text="Skipping snapshot: AssemblyInformationalVersion and version_number must be identical and end with -snapshot. Assembly=$(_ThunderstoreInformationalVersion), manifest=$(_ThunderstoreVersion)." Importance="high" />
+  </Target>
+
+  <Target Name="PackageThunderstore" DependsOnTargets="CheckSnapshotEligibility;_PackageThunderstore"
+          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'" />
+
+  <Target Name="_PackageThunderstore" DependsOnTargets="$(_ThunderstoreBuildDependency)"
+          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)' And ('$(SnapshotBuild)' != 'true' Or '$(_SnapshotEligible)' == 'true')">
+    <PropertyGroup>
+      <_ThunderstoreManifest>$([System.IO.File]::ReadAllText('$(MSBuildProjectDirectory)\manifest.json'))</_ThunderstoreManifest>
+      <_ThunderstoreName>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreManifest)', '&quot;name&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_ThunderstoreName>
+      <_ThunderstoreVersion>$([System.Text.RegularExpressions.Regex]::Match('$(_ThunderstoreManifest)', '&quot;version_number&quot;\s*:\s*&quot;([^&quot;]+)&quot;').Groups[1].Value)</_ThunderstoreVersion>
+      <_ThunderstoreValidName>$([System.Text.RegularExpressions.Regex]::IsMatch('$(_ThunderstoreName)', '^[A-Za-z0-9_]+$'))</_ThunderstoreValidName>
+      <_ThunderstoreValidVersion>$([System.Text.RegularExpressions.Regex]::IsMatch('$(_ThunderstoreVersion)', '^\d+\.\d+\.\d+(-(draft|snapshot))?$'))</_ThunderstoreValidVersion>
+      <_ThunderstoreStaging>$(MSBuildProjectDirectory)\$(IntermediateOutputPath)thunderstore-$([System.Guid]::NewGuid().ToString('N'))</_ThunderstoreStaging>
+      <ThunderstoreArchive>$(ThunderstoreOutputPath)\$(ThunderstoreNamespace)-$(_ThunderstoreName)-$(_ThunderstoreVersion).zip</ThunderstoreArchive>
+    </PropertyGroup>
+    <Error Condition="'$(_ThunderstoreValidName)' != 'True' Or '$(_ThunderstoreValidVersion)' != 'True'"
+           Text="Invalid package metadata in manifest.json." />
+    <ItemGroup>
+      <_ThunderstoreFiles Include="$(TargetPath);$(MSBuildProjectDirectory)\icon.png;$(MSBuildProjectDirectory)\manifest.json;$(MSBuildProjectDirectory)\README.md" />
+      <_ThunderstoreFiles Include="$(MSBuildProjectDirectory)\CHANGELOG.md" Condition="Exists('$(MSBuildProjectDirectory)\CHANGELOG.md')" />
+      <_ThunderstoreFiles Include="@(_SnapshotExtraFiles)" />
+    </ItemGroup>
+    <MakeDir Directories="$(_ThunderstoreStaging);$(ThunderstoreOutputPath)" />
+    <Copy SourceFiles="@(_ThunderstoreFiles)" DestinationFolder="$(_ThunderstoreStaging)" />
+    <ZipDirectory SourceDirectory="$(_ThunderstoreStaging)" DestinationFile="$(ThunderstoreArchive)" Overwrite="true" />
+    <RemoveDir Directories="$(_ThunderstoreStaging)" />
+    <Message Text="Thunderstore package: $(ThunderstoreArchive)" Importance="high" />
+  </Target>
+
+  <Target Name="StageSnapshotExtras"
+          Condition="'$(ThunderstoreProject)' == '$(MSBuildProjectFullPath)'">
+    <Copy SourceFiles="@(_SnapshotExtraFiles)" DestinationFolder="$(MSBuildProjectDirectory)\bin\snapshot" Condition="'@(_SnapshotExtraFiles)' != ''" />
+  </Target>
+</Project>

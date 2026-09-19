@@ -39,7 +39,7 @@ jobs:
         with:
           persist-credentials: false
       - id: check
-        uses: landoria-gaming/LandoriaModActions/actions/check-release@v4.5
+        uses: landoria-gaming/LandoriaModActions/actions/check-release@v4.8
   package:
     needs: eligibility
     if: needs.eligibility.outputs.eligible == 'true' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
@@ -53,12 +53,12 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Restore compilation references
-        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.5
+        uses: landoria-gaming/LandoriaModActions/actions/restore-references@v4.8
         with:
           references-repository: ${{ inputs.references-repository }}
           token: ${{ secrets.references-token }}
       - name: Build release ZIP
-        uses: landoria-gaming/LandoriaModActions/actions/build-release@v4.5
+        uses: landoria-gaming/LandoriaModActions/actions/build-release@v4.8
         with:
           project-file: ${{ inputs.project-file }}
       - name: Upload release ZIP
@@ -70,7 +70,7 @@ jobs:
           retention-days: 30
       - name: Promote release to Thunderstore
         if: inputs['promote-to-thunderstore']
-        uses: landoria-gaming/LandoriaModActions/actions/publish-thunderstore@v4.7
+        uses: landoria-gaming/LandoriaModActions/actions/publish-thunderstore@v4.8
         with:
           package-file: bin/thunderstore/*.zip
           package-namespace: ${{ inputs.package-namespace }}
