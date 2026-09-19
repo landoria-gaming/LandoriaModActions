@@ -1,7 +1,8 @@
 # Landoria Mod Actions
 
 Manual `Release package` builds one Thunderstore ZIP when all five source versions match X.Y.Z.
-The ZIP is a workflow artifact; no GitHub release or tag is created.
+The ZIP is a workflow artifact; no GitHub release or tag is created. Its optional
+`promote-to-thunderstore` input publishes the ZIP with the official Thunderstore CLI.
 
 Reusable Windows GitHub Actions for standalone Landoria Valheim mods.
 
@@ -22,6 +23,7 @@ success with a two-hour download grace period. Expired references are regenerate
 - `restore-references`: dispatches the central check, waits for success, downloads that run's bundle, verifies all DLL hashes and exports build paths.
 - `build-snapshot`: builds with the mod's HarmonyValidator and calls its PackageThunderstore target. Reference versions and source run are recorded in build metadata.
 - `publish-snapshot`: updates the snapshot prerelease with only the versioned Thunderstore ZIP, only for the current main head.
+- `publish-thunderstore`: downloads the official CLI source and publishes one existing ZIP.
 
 Composite actions require Windows, Bash and jq. Compilation, staging and ZIP
 creation use MSBuild targets. PowerShell scripts are not used. The publishing action requires
@@ -57,6 +59,9 @@ repositories. Use a dedicated fine-grained PAT with Actions: write and Metadata:
 restricted to the private LandoriaModReferences repository. Actions: write is
 needed to dispatch the on-demand check. Ordinary mod GITHUB_TOKEN cannot access it.
 Do not reuse an administrator token or expose reference files in public artifacts.
+
+Release consumers can set `promote-to-thunderstore: true` and pass a service
+account token through the `thunderstore-token` secret. Promotion is disabled by default.
 
 All pull requests and manual runs outside main skip dependency builds;
 never use pull_request_target to execute untrusted source with this token.

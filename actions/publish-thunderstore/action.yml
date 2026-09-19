@@ -1,0 +1,34 @@
+name: Publish Thunderstore package
+description: Publishes an existing package ZIP with the official Thunderstore CLI.
+inputs:
+  package-file:
+    description: Path or glob for exactly one package ZIP.
+    required: true
+  package-namespace:
+    description: Thunderstore team namespace.
+    required: true
+  community:
+    description: Thunderstore community identifier.
+    default: valheim
+  token:
+    description: Thunderstore service account token.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download Thunderstore CLI source
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      with:
+        repository: thunderstore-io/thunderstore-cli
+        ref: ad356c3bb167ad92766f62dc5ea89b15e1272966
+        path: .landoria-tools/thunderstore-cli
+        persist-credentials: false
+    - name: Publish package
+      shell: bash
+      env:
+        PACKAGE_FILE: ${{ inputs.package-file }}
+        PACKAGE_NAMESPACE: ${{ inputs.package-namespace }}
+        THUNDERSTORE_COMMUNITY: ${{ inputs.community }}
+        TCLI_AUTH_TOKEN: ${{ inputs.token }}
+        TCLI_PROJECT: .landoria-tools/thunderstore-cli/ThunderstoreCLI/ThunderstoreCLI.csproj
+      run: bash "$(cygpath -u "$ACTION_DIRECTORY")/../../tools/publish-thunderstore.sh"

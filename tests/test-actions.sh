@@ -194,4 +194,19 @@ export GITHUB_REF=refs/heads/main GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA
 grep -qx 'release upload snapshot release/Landoria-Test-1.0.11-snapshot.zip --clobber' "$ASSET_TRACE"
 grep -q 'release delete-asset snapshot Landoria-Test-snapshot.zip' "$ASSET_TRACE"
 grep -q 'release delete-asset snapshot Landoria.Test-1.0.11-snapshot.zip' "$ASSET_TRACE"
+
+# Thunderstore publication selects one ZIP and keeps the token out of command arguments.
+mkdir -p "$fixture/publish-source" "$fixture/publish-output"
+printf '{"name":"Test","version_number":"1.0.11","categories":["mods"]}\n' > "$fixture/publish-source/manifest.json"
+dotnet msbuild "$(cygpath -m "$root/tools/archive.proj")" -t:Zip \
+  "-p:SourceDirectory=$(cygpath -m "$fixture/publish-source")" \
+  "-p:DestinationFile=$(cygpath -m "$fixture/publish-output/Landoria-Test-1.0.11.zip")"
+dotnet() { printf '%s\n' "$*" > "$PUBLISH_TRACE"; }
+export -f dotnet
+export PACKAGE_FILE="$fixture/publish-output/*.zip" PACKAGE_NAMESPACE=Landoria
+export THUNDERSTORE_COMMUNITY=valheim TCLI_AUTH_TOKEN=mock-not-a-real-token
+export TCLI_PROJECT=ThunderstoreCLI.csproj PUBLISH_TRACE="$fixture/publish-trace"
+bash "$root/tools/publish-thunderstore.sh"
+grep -q 'publish --config-path .* --file .*Landoria-Test-1.0.11.zip' "$PUBLISH_TRACE"
+if grep -q "$TCLI_AUTH_TOKEN" "$PUBLISH_TRACE"; then exit 1; fi
 echo 'Bash action tests passed.'

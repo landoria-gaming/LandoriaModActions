@@ -8,11 +8,22 @@ on:
       mod-name:
         required: true
         type: string
+      package-namespace:
+        required: true
+        type: string
+      promote-to-thunderstore:
+        default: false
+        type: boolean
+      thunderstore-community:
+        default: valheim
+        type: string
       references-repository:
         default: landoria-gaming/LandoriaModReferences
         type: string
     secrets:
       references-token:
+        required: false
+      thunderstore-token:
         required: false
 permissions:
   contents: read
@@ -57,3 +68,11 @@ jobs:
           path: bin/thunderstore/*.zip
           if-no-files-found: error
           retention-days: 30
+      - name: Promote release to Thunderstore
+        if: inputs['promote-to-thunderstore']
+        uses: landoria-gaming/LandoriaModActions/actions/publish-thunderstore@v4.6
+        with:
+          package-file: bin/thunderstore/*.zip
+          package-namespace: ${{ inputs.package-namespace }}
+          community: ${{ inputs.thunderstore-community }}
+          token: ${{ secrets.thunderstore-token }}
