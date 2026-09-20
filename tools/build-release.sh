@@ -4,6 +4,7 @@ tools=$(cd "$(dirname "$0")" && pwd)
 actions_root=$(cd "$tools/.." && pwd)
 thunderstore_targets=$(cygpath -m "$actions_root/build/Thunderstore.targets")
 mod_project=$(cygpath -m "$PWD/$PROJECT_FILE")
+bash "$tools/restore-code-snippets.sh"
 mkdir -p obj
 printf 'Compilation references: Valheim %s | BepInEx %s | Reference run %s\n' \
   "$VALHEIM_VERSION" "$BEPINEX_VERSION" "$REFERENCE_RUN_ID" | tee obj/release-build.log

@@ -6,6 +6,7 @@ actions_root=$(cd "$tools/.." && pwd)
 native_path() { cygpath -m "$1"; }
 thunderstore_targets=$(native_path "$actions_root/build/Thunderstore.targets")
 mod_project=$(native_path "$PWD/$PROJECT_FILE")
+bash "$tools/restore-code-snippets.sh"
 mkdir -p obj
 printf 'Compilation references: Valheim %s | BepInEx %s | Reference run %s\n' \
   "$VALHEIM_VERSION" "$BEPINEX_VERSION" "$REFERENCE_RUN_ID" | tee obj/snapshot-build.log
